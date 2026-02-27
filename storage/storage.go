@@ -4,7 +4,6 @@ import (
 	"crypto/sha1"
 	"io"
 	"read-adviser-bot/libs/e"
-	"read-adviser-bot/storage"
 )
 
 type Storage interface {

@@ -9,10 +9,9 @@ import (
 	"path/filepath"
 	"read-adviser-bot/libs/e"
 	"read-adviser-bot/storage"
-	"time"
 )
 
-const defaultParam = 0774
+const defaultPerm = 0774
 
 var ErrNoSavedPage = errors.New("not saved page")
 
@@ -25,11 +24,11 @@ func New(basePath string) Storage {
 }
 
 func (s Storage) Save(page *storage.Page) (err error) {
-	defer func() { err = e.WrapIfErr("can't save a page", err) }()
+	defer func() { err = e.WrapIfErr("can't save page", err) }()
 
 	fPath := filepath.Join(s.basePath, page.UserName)
 
-	if err := os.MkdirAll(fPath, defaultParam); err != nil {
+	if err := os.MkdirAll(fPath, defaultPerm); err != nil {
 		return err
 	}
 
@@ -44,10 +43,9 @@ func (s Storage) Save(page *storage.Page) (err error) {
 	if err != nil {
 		return err
 	}
-
 	defer func() { _ = file.Close() }()
 
-	if err := gob.Encoder(file).Encode(page); err != nil {
+	if err := gob.NewEncoder(file).Encode(page); err != nil {
 		return err
 	}
 
