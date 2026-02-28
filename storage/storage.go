@@ -2,6 +2,7 @@ package storage
 
 import (
 	"crypto/sha1"
+	"encoding/hex"
 	"io"
 	"read-adviser-bot/libs/e"
 )
@@ -28,6 +29,6 @@ func (p Page) Hash() (string, error) {
 	if _, err := io.WriteString(h, p.UserName); err != nil {
 		return "", e.Wrap("can't calculate hash", err)
 	}
+
+	return hex.EncodeToString(h.Sum(nil)), nil
 }
-
-
