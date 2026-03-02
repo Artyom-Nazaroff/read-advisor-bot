@@ -1,18 +1,15 @@
 package telegram
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
-	"read-adviser-bot/libs/e"
 	"strconv"
-)
 
-const (
-	getUpdatesMethod  = "getUpdates"
-	sendMessageMethod = "sendMessage"
+	"read-adviser-bot/lib/e"
 )
 
 type Client struct {
@@ -21,8 +18,13 @@ type Client struct {
 	client   http.Client
 }
 
-func New(host, token string) Client {
-	return Client{
+const (
+	getUpdatesMethod  = "getUpdates"
+	sendMessageMethod = "sendMessage"
+)
+
+func New(host string, token string) *Client {
+	return &Client{
 		host:     host,
 		basePath: newBasePath(token),
 		client:   http.Client{},
@@ -33,12 +35,14 @@ func newBasePath(token string) string {
 	return "bot" + token
 }
 
-func (c *Client) Updates(offset int, limit int) ([]Update, error) {
+func (c *Client) Updates(ctx context.Context, offset int, limit int) (updates []Update, err error) {
+	defer func() { err = e.WrapIfErr("can't get updates", err) }()
+
 	q := url.Values{}
 	q.Add("offset", strconv.Itoa(offset))
 	q.Add("limit", strconv.Itoa(limit))
 
-	data, err := c.makeRequest(getUpdatesMethod, q)
+	data, err := c.makeRequest(ctx, getUpdatesMethod, q)
 	if err != nil {
 		return nil, err
 	}
@@ -52,46 +56,42 @@ func (c *Client) Updates(offset int, limit int) ([]Update, error) {
 	return res.Result, nil
 }
 
-func (c *Client) SendMessage(chatId int, text string) error {
+func (c *Client) SendMessage(ctx context.Context, chatID int, text string) error {
 	q := url.Values{}
-	q.Add("chat_id", strconv.Itoa(chatId))
+	q.Add("chat_id", strconv.Itoa(chatID))
 	q.Add("text", text)
 
-	_, err := c.makeRequest(sendMessageMethod, q)
+	_, err := c.makeRequest(ctx, sendMessageMethod, q)
 	if err != nil {
-		return e.Wrap("can't send message: ", err)
+		return e.Wrap("can't send message", err)
 	}
 
 	return nil
 }
 
-func (c *Client) makeRequest(method string, query url.Values) (data []byte, err error) {
-	defer func() {
-		const errMsg = "couldn't make a request:"
-		err = e.WrapIfErr(errMsg, err)
-	}()
+func (c *Client) makeRequest(ctx context.Context, method string, query url.Values) (data []byte, err error) {
+	defer func() { err = e.WrapIfErr("can't do request", err) }()
+
 	u := url.URL{
 		Scheme: "https",
 		Host:   c.host,
 		Path:   path.Join(c.basePath, method),
 	}
 
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	req.URL.RawQuery = query.Encode()
 
-	res, err := c.client.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = res.Body.Close()
-	}()
+	defer func() { _ = resp.Body.Close() }()
 
-	body, err := io.ReadAll(res.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
